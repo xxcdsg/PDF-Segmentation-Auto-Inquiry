@@ -7,12 +7,12 @@ from config.config import load_configs, write_configs
 from data_processing.string_processing import list_to_markdown
 from markdown_read import get_lines
 from parallel.parallel_main import process_lines_parallel
+from typing import List
 
 # 获取源文件所在的目录
 def get_source_file_dir():
     source_file_path = os.path.abspath(__file__)
     return os.path.dirname(source_file_path)
-
 
 def generate_zip(files_to_zip):
 
@@ -22,49 +22,62 @@ def generate_zip(files_to_zip):
         for file in files_to_zip:
             if os.path.exists(file):
                 zipf.write(file, os.path.basename(file))
+            else:
+                print("file not found",file)
 
     return zip_path  # 返回 ZIP 文件路径
 
-def handle_file_and_directory(file_obj):
-    # 获取文件的临时存储路径
-    input_path = file_obj.name
 
-    # 获取文件名并构建输出路径
-    base_name = os.path.basename(input_path)
-
+def process_single_pdf(pdf_path: str, output_dir: str) -> List[str]:
+    """处理单个PDF文件并返回生成的文件列表"""
+    base_name = os.path.basename(pdf_path)
     file_name_without_extension = os.path.splitext(base_name)[0]
-    input_md_path = get_source_file_dir() + "\\output\\" + file_name_without_extension + ".md"
-    #判断文件是否存在
-    if os.path.exists(input_md_path):
-        print(f"文件 {input_md_path} 存在。")
-    else:
-        print(f"文件 {input_md_path} 不存在。开始生成markdown文件")
-        pdf_to_markdown.process_pdf(input_path,get_source_file_dir() + "\\output")
+    input_md_path = os.path.join(output_dir, f"{file_name_without_extension}.md")
 
-    # 返回处理结果
-    # return f"File copied to {output_path}"
-
-    prefix = os.path.dirname(input_path)
+    if not os.path.exists(input_md_path):
+        print(f"正在转换: {base_name} 为Markdown...")
+        pdf_to_markdown.process_pdf(pdf_path, output_dir)
 
     lines = get_lines(input_md_path)
-
-    last_outputs = []
-
-    ptop = 0 # 小数据测试
-
-    # 并行处理
     last_outputs = process_lines_parallel(lines)
 
-    # file_name_without_extension
-    # 交给string_processing生成markdown格式表格
+    base_dir = os.path.dirname(os.path.abspath(__file__))
     lis = list_to_markdown(file_name_without_extension, last_outputs)
-    lis = [os.path.join("data_processing", x) for x in lis]
+    lis = [os.path.join(base_dir,"data_processing", x) for x in lis]
     lis = [x + ".md" for x in lis]
-    zip_path = generate_zip(lis)
-    return [
-        f'完成，文件存储在 {zip_path}',  # 文本消息
-        zip_path  # 要下载的文件路径
-    ]
+
+    return lis
+
+def handle_files_and_directories(file_objs):
+    output_dir = os.path.join(get_source_file_dir(), "output")
+    os.makedirs(output_dir, exist_ok=True)
+
+    all_output_files = []
+    processed_files = []
+    failed_files = []
+
+    for file_obj in file_objs:
+        try:
+            if file_obj.name.lower().endswith('.pdf'):
+                files = process_single_pdf(file_obj.name, output_dir)
+                all_output_files.extend(files)
+                processed_files.append(os.path.basename(file_obj.name))
+        except Exception as e:
+            failed_files.append(f"{os.path.basename(file_obj.name)}: {str(e)}")
+            continue
+
+    if not all_output_files:
+        return ["没有生成任何文件，请检查输入文件", None]
+
+    zip_path = generate_zip(all_output_files)
+
+    message = "处理完成！\n"
+    if processed_files:
+        message += f"成功处理文件：\n" + "\n".join(processed_files) + "\n\n"
+    if failed_files:
+        message += f"处理失败文件：\n" + "\n".join(failed_files)
+
+    return [message, zip_path]
 
 
 def save_config(
@@ -98,23 +111,28 @@ def save_config(
 
 # 运行页面
 
+# 修改后的运行界面
 def create_run_page():
     with gr.Blocks() as run_page:
-        # 组件定义
-        file_input = gr.File(label="选择输入文件")
+        with gr.Row():
+            file_input = gr.File(
+                label="选择PDF文件或文件夹",
+                file_count="multiple",
+                file_types=[".pdf", "folder"]
+            )
         result_message = gr.Textbox(label="处理结果")
-        download_btn = gr.DownloadButton(label="下载文件", visible=False)
+        download_btn = gr.DownloadButton(label="下载处理结果", visible=False)
+        process_btn = gr.Button("开始批量处理", variant="primary")
 
-        # 处理按钮
-        process_btn = gr.Button("开始处理")
-
-        # 点击事件
         @process_btn.click(
             inputs=[file_input],
             outputs=[result_message, download_btn]
         )
-        def handle_process(file_obj):
-            message, zip_path = handle_file_and_directory(file_obj)
+        def handle_process(file_objs):
+            if not file_objs:
+                return ["请先选择文件或文件夹", None]
+
+            message, zip_path = handle_files_and_directories(file_objs)
             return [
                 message,
                 gr.DownloadButton(visible=True, value=zip_path)

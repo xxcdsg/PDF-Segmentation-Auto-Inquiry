@@ -268,7 +268,6 @@ def ask_one_line_baidu_mul(user_input):
     return res
 
 
-
 def ask_one_line(user_input):
 
     model_type = configs["model_type"]
@@ -293,3 +292,5 @@ def ask_one_line_mul(user_input):
         return ask_one_line_glm_mul(user_input)
     if model_type == "tx_deepseek":
         return ask_one_line_tx_deepseek_mul(user_input)
+    # if model_type == "openai_mod":
+        # return ask_one_line_openai_mul(user_input)
