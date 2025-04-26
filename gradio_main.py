@@ -82,6 +82,7 @@ def handle_files_and_directories(file_objs):
 
 def save_config(
         baidu_api, baidu_secret, kimi_api, zhipu_api,tx_deepseek_api,
+        openai_api,openai_baseurl,openai_model,
         model_radio,
         pre_prompt, num_workers,ask_info_num,hash_num ,
         print_info,
@@ -94,6 +95,10 @@ def save_config(
         "kimi_api_key": kimi_api,
         "Zhipu_api_key": zhipu_api,
         "tx_deepseek_api_key": tx_deepseek_api,
+
+        "openai_api_key": openai_api,
+        "openai_baseurl": openai_baseurl,
+        "openai_model": openai_model,
 
         "model_type": model_radio,
 
@@ -149,7 +154,7 @@ def create_config_page():
 
         gr.Markdown("## 模型选择")
         model_radio = gr.Radio(
-            choices=["kimi", "glm", "baidu", "tx_deepseek"],  # 根据实际情况调整模型选项
+            choices=["kimi", "glm", "baidu", "tx_deepseek","openai_mod"],  # 根据实际情况调整模型选项
             value=config.get("model_name", config["model_type"]),  # 默认值
             label="选择主要使用的大模型"
         )
@@ -163,6 +168,11 @@ def create_config_page():
             zhipu_api = gr.Textbox(config["Zhipu_api_key"], label="智谱API Key")
         with gr.Row():
             tx_deepseek_api = gr.Textbox(config["tx_deepseek_api_key"], label="腾讯云deepseek API Key")
+        with gr.Row():
+            gr.Markdown("### openai模式")
+            openai_api = gr.Textbox(config["openai_api_key"], label="API Key")
+            openai_baseurl = gr.Textbox(config["openai_baseurl"], label="Baseurl")
+            openai_model = gr.Textbox(config["openai_model"], label="模型名")
 
         gr.Markdown("## 提示信息配置")
         pre_prompt = gr.TextArea(config["pre_prompt"], label="前置提示语", lines=4)
@@ -195,6 +205,7 @@ def create_config_page():
 
         inputs = [
             baidu_api, baidu_secret, kimi_api, zhipu_api,tx_deepseek_api,
+            openai_api,openai_baseurl,openai_model,
             model_radio,
             pre_prompt, num_workers,ask_info_num,hash_num,
             print_info,

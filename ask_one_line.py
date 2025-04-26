@@ -2,6 +2,7 @@ from ai_api.glm_ai_api import send_question_glm
 from ai_api.kimi_ai_api import send_message
 from ai_api.messages_handle import *
 from ai_api.Baidu_AI_Cloud_api import *
+from ai_api.openai_api import send_question_open_ai
 from ai_api.tx_deepseek_api import send_question_tx_deepseek
 from config.hash_map import check_hash_map, load_in_hash_map
 
@@ -267,6 +268,33 @@ def ask_one_line_baidu_mul(user_input):
 
     return res
 
+def ask_one_line_openai_mul(user_input,api_key,base_url,model):
+    completion = send_question_open_ai(build_messages(pre_prompt + " 段落原文:" + user_input),api_key,base_url,model)
+
+    if 'No' in completion.choices[0].message.content:
+        print("该行与提示词无关,跳过")
+        return [""]
+
+    res = []
+
+    for idx in range(0, configs["ask_info_num"]):
+        info = ask_info[idx]
+        if idx == 0:
+            info += "\n原文为：" + '\n' + user_input
+            messages = build_messages(info)
+        else:
+            messages = []
+            messages = extend_messages(info, output, messages)
+        completion = send_question_tx_deepseek(messages)
+        output = completion.choices[0].message.content
+
+        res.append(output)
+
+        # 输出中途结果
+        if configs["print_info"] == 1:
+            print(output)
+
+    return res
 
 def ask_one_line(user_input):
 
@@ -292,5 +320,8 @@ def ask_one_line_mul(user_input):
         return ask_one_line_glm_mul(user_input)
     if model_type == "tx_deepseek":
         return ask_one_line_tx_deepseek_mul(user_input)
-    # if model_type == "openai_mod":
-        # return ask_one_line_openai_mul(user_input)
+    if model_type == "openai_mod":
+        _key = configs["openai_api_key"]
+        _url = configs["openai_baseurl"]
+        _model = configs["openai_model"]
+        return ask_one_line_openai_mul(user_input,_key,_url,_model)
